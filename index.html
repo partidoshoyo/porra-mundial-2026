@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🏆 Porra Mundial 2026</title>
+
+  <!-- ============================================================
+       MUNDIAL 2026 - PORRA FAMILIAR
+       Archivo: index.html
+       Cómo funciona:
+         1. Esta página carga datos desde Google Apps Script (tu API)
+         2. Muestra clasificación, partidos, porra y reglas
+         3. El admin puede introducir apuestas y resultados
+       ============================================================ -->
+
+  <style>
+    /* ── VARIABLES DE COLOR Y TIPOGRAFÍA ── */
+    :root {
+      --verde:    #1a7a4a;
+      --verde-claro: #e8f5ef;
+      --azul:     #0d2b55;
+      --dorado:   #c9920a;
+      --dorado-claro: #fff8e1;
+      --fondo:    #f4f6f8;
+      --blanco:   #ffffff;
+      --gris:     #6b7280;
+      --gris-claro: #e5e7eb;
+      --rojo:     #dc2626;
+      --radio:    12px;
+      --sombra:   0 2px 8px rgba(0,0,0,0.10);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--fondo);
+      color: var(--azul);
+      min-height: 100vh;
+      padding-bottom: 80px; /* espacio para nav inferior */
+    }
+
+    /* ── CABECERA ── */
+    header {
+      background: linear-gradient(135deg, var(--azul) 0%, #1a3a6b 100%);
+      color: white;
+      text-align: center;
+      padding: 20px 16px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    header p {
+      font-size: 0.78rem;
+      opacity: 0.75;
+      margin-top: 2px;
+    }
+    #estado-sync {
+      font-size: 0.72rem;
+      margin-top: 6px;
+      color: #90caf9;
+    }
+
+    /* ── NAVEGACIÓN INFERIOR ── */
+    nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--azul);
+      display: flex;
+      z-index: 200;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.2);
+    }
+    nav button {
+      flex: 1;
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.6);
+      padding: 10px 4px 8px;
+      font-size: 0.65rem;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      transition: color 0.2s;
+    }
+    nav button .icon { font-size: 1.3rem; }
+    nav button.activo {
+      color: var(--dorado);
+      border-top: 2px solid var(--dorado);
+    }
+
+    /* ── SECCIONES ── */
+    .seccion {
+      display: none;
+      padding: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .seccion.activa { display: block; }
+
+    .seccion-titulo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--azul);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── CARDS GENÉRICOS ── */
+    .card {
+      background: var(--blanco);
+      border-radius: var(--radio);
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--sombra);
+    }
+
+    /* ── BOTÓN PRINCIPAL ── */
+    .btn {
+      background: var(--verde);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .btn:active { opacity: 0.85; }
+    .btn.secundario {
+      background: var(--gris-claro);
+      color: var(--azul);
+    }
+    .btn.peligro { background: var(--rojo); }
+
+    /* ── SPINNER ── */
+    .spinner {
+      text-align: center;
+      padding: 40px;
+      color: var(--gris);
+      font-size: 0.9rem;
+    }
+    .spinner::before {
+      content: '';
+      display: block;
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--gris-claro);
+      border-top-color: var(--verde);
+      border-radius: 50%;
+      animation: giro 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes giro { to { transform: rotate(360deg); } }
+
+    /* ══════════════════════════════════════
+       SECCIÓN 1: CLASIFICACIÓN
+    ══════════════════════════════════════ */
+    .ranking-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      background: var(--blanco);
+      border-radius: var(--radio);
+      margin-bottom: 8px;
+      box-shadow: var(--sombra);
+    }
+    .ranking-item.top1 { border-left: 4px solid #ffd700; background: #fffde7; }
+    .ranking-item.top2 { border-left: 4px solid #c0c0c0; }
+    .ranking-item.top3 { border-left: 4px solid #cd7f32; }
+
+    .pos {
+      font-size: 1.2rem;
+      font-weight: 800;
+      width: 28px;
+      text-align: center;
+      color: var(--gris);
+      flex-shrink: 0;
+    }
+    .top1 .pos { color: #c9920a; }
+
+    .jugador-info { flex: 1; min-width: 0; }
+    .jugador-nombre {
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .jugador-selecciones {
+      font-size: 0.72rem;
+      color: var(--gris);
+      margin-top: 2px;
+    }
+
+    .puntos-total {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--verde);
+      flex-shrink: 0;
+    }
+    .top1 .puntos-total { color: var(--dorado); }
+
+    /* Desglose de puntos */
+    .desglose {
+      display: none;
+      background: var(--fondo);
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 8px;
+      font-size: 0.8rem;
+    }
+    .desglose.visible { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .desg-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 8px;
+      background: white;
+      border-radius: 6px;
+    }
+    .desg-label { color: var(--gris); }
+    .desg-val { font-weight: 700; color: var(--azul); }
+
+    /* ══════════════════════════════════════
+       SECCIÓN 2: PORRA
+    ══════════════════════════════════════ */
+    .porra-partido {
+      background: var(--blanco);
+      border-radius: var(--radio);
+      margin-bottom: 12px;
+      box-shadow: var(--sombra);
+      overflow: hidden;
+    }
+    .porra-cabecera {
+      background: var(--azul);
+      color: white;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .porra-partido-nombre { font-weight: 700; }
+    .porra-fecha { font-size: 0.72rem; opacity: 0.8; }
+
+    .porra-cuerpo { padding: 10px 14px; }
+
+    .porra-marcador {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+    }
+    .porra-equipo { flex: 1; text-align: center; font-weight: 600; font-size: 0.8rem; }
+    .porra-vs { color: var(--gris); font-size: 0.75rem; }
+
+    /* Resultado real */
+    .resultado-real {
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--verde);
+      margin-bottom: 8px;
+    }
+
+    /* Predicciones por jugador */
+    .pred-lista { display: flex; flex-direction: column; gap: 6px; }
+    .pred-fila {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+    }
+    .pred-nombre {
+      width: 60px;
+      flex-shrink: 0;
+      font-weight: 600;
+      color: var(--azul);
+      font-size: 0.78rem;
+    }
+    .pred-input {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+    }
+    .pred-input input {
+      width: 38px;
+      text-align: center;
+      border: 1.5px solid var(--gris-claro);
+      border-radius: 6px;
+      padding: 5px 2px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--azul);
+    }
+    .pred-input input:disabled {
+      background: var(--fondo);
+      color: var(--gris);
+    }
+    .pred-guion { color: var(--gris); }
+
+    .pred-resultado {
+      font-size: 0.75rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .pred-ok { background: #d1fae5; color: #065f46; font-weight: 700; }
+    .pred-no { background: var(--fondo); color: var(--gris); }
+
+    /* Admin panel */
+    #panel-admin {
+      background: var(--dorado-claro);
+      border: 1.5px solid var(--dorado);
+      border-radius: var(--radio);
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+    #panel-admin p {
+      font-size: 0.78rem;
+      color: var(--azul);
+      margin-bottom: 8px;
+    }
+    #admin-pass {
+      width: 100%;
+      border: 1.5px solid var(--gris-claro);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+
+    /* Estado partido badge */
+    .badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-pendiente { background: var(--gris-claro); color: var(--gris); }
+    .badge-en-juego  { background: #fef3c7; color: #92400e; }
+    .badge-finalizado { background: #d1fae5; color: #065f46; }
+
+    /* ══════════════════════════════════════
+       SECCIÓN 3: PARTIDOS
+    ══════════════════════════════════════ */
+    .partido-card {
+      background: var(--blanco);
+      border-radius: var(--radio);
+      margin-bottom: 10px;
+      box-shadow: var(--sombra);
+      overflow: hidden;
+    }
+    .partido-fase {
+      background: var(--verde);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 4px 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .partido-cuerpo {
+      padding: 12px;
+    }
+    .partido-fecha {
+      font-size: 0.72rem;
+      color: var(--gris);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .partido-equipos {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .partido-equipo {
+      flex: 1;
+      text-align: center;
+    }
+    .partido-bandera { font-size: 1.8rem; display: block; }
+    .partido-nombre-equipo {
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+    .partido-asignado {
+      font-size: 0.65rem;
+      color: var(--verde);
+      font-weight: 700;
+    }
+    .partido-marcador {
+      text-align: center;
+      flex-shrink: 0;
+      min-width: 60px;
+    }
+    .partido-goles {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--azul);
+    }
+    .partido-pendiente { color: var(--gris); font-size: 1.2rem; }
+
+    .partido-puntos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--gris-claro);
+    }
+    .punto-chip {
+      font-size: 0.68rem;
+      background: var(--verde-claro);
+      color: var(--verde);
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    /* ══════════════════════════════════════
+       SECCIÓN 4: REGLAS
+    ══════════════════════════════════════ */
+    .regla-bloque {
+      background: var(--blanco);
+      border-radius: var(--radio);
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--sombra);
+    }
+    .regla-titulo {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--azul);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .regla-lista {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .regla-lista li {
+      font-size: 0.82rem;
+      color: #374151;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.4;
+    }
+    .regla-lista li::before {
+      content: '→';
+      color: var(--verde);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .pts-badge {
+      background: var(--verde);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-left: 4px;
+    }
+
+    /* ══════════════════════════════════════
+       TABLA DE SELECCIONES
+    ══════════════════════════════════════ */
+    .tabla-jugadores {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .tabla-jugadores th {
+      background: var(--azul);
+      color: white;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 0.75rem;
+    }
+    .tabla-jugadores td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--gris-claro);
+    }
+    .tabla-jugadores tr:last-child td { border-bottom: none; }
+    .tabla-jugadores tr:nth-child(even) td { background: var(--fondo); }
+
+    /* ── TOAST MENSAJES ── */
+    #toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--azul);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 500;
+      white-space: nowrap;
+    }
+    #toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    #toast.ok { background: var(--verde); }
+    #toast.error { background: var(--rojo); }
+
+    /* ── MENSAJE ERROR ── */
+    .error-msg {
+      text-align: center;
+      padding: 30px 20px;
+      color: var(--gris);
+    }
+    .error-msg .icon { font-size: 2.5rem; margin-bottom: 10px; }
+    .error-msg p { font-size: 0.85rem; line-height: 1.5; }
+    .error-msg small {
+      display: block;
+      margin-top: 8px;
+      font-size: 0.72rem;
+      color: #9ca3af;
+    }
+
+    /* ── FILTROS ── */
+    .filtros {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .filtro-btn {
+      background: var(--blanco);
+      border: 1.5px solid var(--gris-claro);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      color: var(--gris);
+    }
+    .filtro-btn.activo {
+      background: var(--verde);
+      border-color: var(--verde);
+      color: white;
+    }
+
+    /* ── MODAL ADMIN (para guardar porra) ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 300;
+      align-items: flex-end;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal-caja {
+      background: white;
+      border-radius: 16px 16px 0 0;
+      padding: 20px;
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .modal-titulo {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════
+       CABECERA
+  ═══════════════════════════════════════ -->
+  <header>
+    <h1>🏆 Porra Mundial 2026</h1>
+    <p>Canadá · México · Estados Unidos</p>
+    <div id="estado-sync">Cargando datos…</div>
+  </header>
+
+  <!-- ═══════════════════════════════════════
+       SECCIÓN 1: CLASIFICACIÓN
+  ═══════════════════════════════════════ -->
+  <section id="sec-clasificacion" class="seccion activa">
+    <div class="seccion-titulo">📊 Clasificación</div>
+    <div id="ranking-container">
+      <div class="spinner">Cargando clasificación…</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       SECCIÓN 2: PORRA
+  ═══════════════════════════════════════ -->
+  <section id="sec-porra" class="seccion">
+    <div class="seccion-titulo">🎯 Porra de resultados</div>
+
+    <!-- Panel de admin (siempre visible, se activa con contraseña) -->
+    <div id="panel-admin" class="card" style="display:none">
+      <p>🔐 Modo administrador — puedes editar predicciones</p>
+      <button class="btn secundario" onclick="cerrarAdmin()">Cerrar sesión admin</button>
+    </div>
+
+    <div id="porra-container">
+      <div class="spinner">Cargando partidos…</div>
+    </div>
+
+    <!-- Botón para entrar como admin -->
+    <div style="text-align:center; margin-top: 10px;">
+      <button class="btn secundario" style="width:auto; font-size:0.75rem; padding:8px 16px"
+              onclick="pedirPassword()">
+        🔑 Entrar como admin
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       SECCIÓN 3: PARTIDOS
+  ═══════════════════════════════════════ -->
+  <section id="sec-partidos" class="seccion">
+    <div class="seccion-titulo">⚽ Partidos</div>
+    <div class="filtros">
+      <button class="filtro-btn activo" onclick="filtrarPartidos('todos', this)">Todos</button>
+      <button class="filtro-btn" onclick="filtrarPartidos('pendiente', this)">Pendientes</button>
+      <button class="filtro-btn" onclick="filtrarPartidos('en_juego', this)">En juego</button>
+      <button class="filtro-btn" onclick="filtrarPartidos('finalizado', this)">Finalizados</button>
+    </div>
+    <div id="partidos-container">
+      <div class="spinner">Cargando partidos…</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       SECCIÓN 4: REGLAS
+  ═══════════════════════════════════════ -->
+  <section id="sec-reglas" class="seccion">
+    <div class="seccion-titulo">📋 Reglas del juego</div>
+
+    <!-- Tabla de selecciones -->
+    <div class="regla-bloque">
+      <div class="regla-titulo">👥 Jugadores y selecciones</div>
+      <table class="tabla-jugadores">
+        <thead>
+          <tr><th>Jugador</th><th>Selección 1</th><th>Selección 2</th></tr>
+        </thead>
+        <tbody id="tabla-jugadores-body"></tbody>
+      </table>
+    </div>
+
+    <div class="regla-bloque">
+      <div class="regla-titulo">⚽ Fase de grupos</div>
+      <ul class="regla-lista">
+        <li>Victoria de tu selección <span class="pts-badge">+3 pts</span></li>
+        <li>Empate de tu selección <span class="pts-badge">+1 pt</span></li>
+        <li>Derrota: 0 puntos</li>
+      </ul>
+    </div>
+
+    <div class="regla-bloque">
+      <div class="regla-titulo">🥇 Clasificación de grupos</div>
+      <ul class="regla-lista">
+        <li>Tu selección pasa 1ª de grupo <span class="pts-badge">+3 pts</span></li>
+        <li>Tu selección pasa 2ª de grupo <span class="pts-badge">+2 pts</span></li>
+        <li>Tu selección pasa 3ª de grupo <span class="pts-badge">+1 pt</span></li>
+      </ul>
+    </div>
+
+    <div class="regla-bloque">
+      <div class="regla-titulo">🏆 Fase eliminatoria</div>
+      <ul class="regla-lista">
+        <li>Pasa de dieciseisavos <span class="pts-badge">+3 pts</span></li>
+        <li>Pasa de octavos <span class="pts-badge">+4 pts</span></li>
+        <li>Pasa de cuartos <span class="pts-badge">+5 pts</span></li>
+        <li>Pasa de semifinal <span class="pts-badge">+6 pts</span></li>
+        <li>Gana la final <span class="pts-badge">+7 pts</span></li>
+        <li>Tercer puesto <span class="pts-badge">+3 pts</span></li>
+      </ul>
+    </div>
+
+    <div class="regla-bloque">
+      <div class="regla-titulo">🎯 Porra de resultados</div>
+      <ul class="regla-lista">
+        <li>Disponible desde dieciseisavos hasta la final.</li>
+        <li>Solo para partidos en los que juegue alguna selección asignada.</li>
+        <li>Acierto exacto del marcador (con prórroga, sin penaltis) <span class="pts-badge">+3 pts</span></li>
+        <li>Las apuestas se bloquean cuando empieza el partido.</li>
+      </ul>
+    </div>
+
+    <div class="regla-bloque">
+      <div class="regla-titulo">⚔️ Selecciones enfrentadas</div>
+      <ul class="regla-lista">
+        <li>En grupos: cada jugador suma lo que le corresponde a su selección.</li>
+        <li>En eliminatorias: solo suma la selección que avanza.</li>
+        <li>La porra funciona normal: el jugador que acierte el marcador exacto suma 3 pts.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       NAVEGACIÓN INFERIOR
+  ═══════════════════════════════════════ -->
+  <nav>
+    <button class="activo" onclick="cambiarSeccion('clasificacion', this)">
+      <span class="icon">📊</span>Ranking
+    </button>
+    <button onclick="cambiarSeccion('porra', this)">
+      <span class="icon">🎯</span>Porra
+    </button>
+    <button onclick="cambiarSeccion('partidos', this)">
+      <span class="icon">⚽</span>Partidos
+    </button>
+    <button onclick="cambiarSeccion('reglas', this)">
+      <span class="icon">📋</span>Reglas
+    </button>
+  </nav>
+
+  <!-- Toast de mensajes -->
+  <div id="toast"></div>
+
+  <!-- ═══════════════════════════════════════
+       JAVASCRIPT
+  ═══════════════════════════════════════ -->
+  <script>
+  // ══════════════════════════════════════════════════════════
+  //  ⚠️ CONFIGURACIÓN — EDITA SOLO ESTAS LÍNEAS
+  // ══════════════════════════════════════════════════════════
+
+  // 1️⃣ Pega aquí la URL de tu Google Apps Script (Web App URL)
+  //    La obtienes al publicar tu Apps Script (ver instrucciones)
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwo7Y13LRRmSH5uKoqFwYivIy-pxBgPNVRh0TE0SJRw2-KaQwRVi-POhVAgVhhrfOFs-w/exec';
+
+  // 2️⃣ Contraseña del administrador para editar la porra
+  const ADMIN_PASSWORD = 'mundial2026';
+
+  // ══════════════════════════════════════════════════════════
+  //  DATOS DE JUGADORES (hardcoded, siempre disponibles)
+  // ══════════════════════════════════════════════════════════
+  const JUGADORES = [
+    { id: 1,  nombre: 'Mery',  sel1: 'Argentina', sel2: 'Ecuador'   },
+    { id: 2,  nombre: 'Leo',   sel1: 'España',    sel2: 'Turquía'   },
+    { id: 3,  nombre: 'Noa',   sel1: 'Francia',   sel2: 'Suiza'     },
+    { id: 4,  nombre: 'Luca',  sel1: 'Inglaterra',sel2: 'Marruecos' },
+    { id: 5,  nombre: 'Liam',  sel1: 'Portugal',  sel2: 'Japón'     },
+    { id: 6,  nombre: 'Nonna', sel1: 'Alemania',  sel2: 'México'    },
+    { id: 7,  nombre: 'Mati',  sel1: 'Brasil',    sel2: 'USA'       },
+    { id: 8,  nombre: 'Ruth',  sel1: 'Holanda',   sel2: 'Uruguay'   },
+    { id: 9,  nombre: 'Max',   sel1: 'Noruega',   sel2: 'Colombia'  },
+    { id: 10, nombre: 'Amin',  sel1: 'Bélgica',   sel2: 'Croacia'   },
+  ];
+
+  // Banderas por selección (emoji)
+  const BANDERAS = {
+    'Argentina':   '🇦🇷', 'Ecuador':    '🇪🇨',
+    'España':      '🇪🇸', 'Turquía':    '🇹🇷',
+    'Francia':     '🇫🇷', 'Suiza':      '🇨🇭',
+    'Inglaterra':  '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'Marruecos':  '🇲🇦',
+    'Portugal':    '🇵🇹', 'Japón':      '🇯🇵',
+    'Alemania':    '🇩🇪', 'México':     '🇲🇽',
+    'Brasil':      '🇧🇷', 'USA':        '🇺🇸',
+    'Holanda':     '🇳🇱', 'Uruguay':    '🇺🇾',
+    'Noruega':     '🇳🇴', 'Colombia':   '🇨🇴',
+    'Bélgica':     '🇧🇪', 'Croacia':    '🇭🇷',
+  };
+
+  // ══════════════════════════════════════════════════════════
+  //  ESTADO GLOBAL
+  // ══════════════════════════════════════════════════════════
+  let datos = null;          // datos completos del servidor
+  let esAdmin = false;       // si el usuario es admin
+  let filtroActual = 'todos';// filtro de partidos activo
+
+  // ══════════════════════════════════════════════════════════
+  //  INICIALIZACIÓN
+  // ══════════════════════════════════════════════════════════
+  document.addEventListener('DOMContentLoaded', () => {
+    rellenarTablaJugadores();
+    cargarDatos();
+  });
+
+  // ── Rellena la tabla de jugadores en la sección de reglas ──
+  function rellenarTablaJugadores() {
+    const tbody = document.getElementById('tabla-jugadores-body');
+    tbody.innerHTML = JUGADORES.map(j => `
+      <tr>
+        <td><strong>${j.nombre}</strong></td>
+        <td>${BANDERAS[j.sel1] || ''} ${j.sel1}</td>
+        <td>${BANDERAS[j.sel2] || ''} ${j.sel2}</td>
+      </tr>
+    `).join('');
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  CARGA DE DATOS DESDE GOOGLE APPS SCRIPT
+  // ══════════════════════════════════════════════════════════
+  async function cargarDatos() {
+    actualizarSync('🔄 Sincronizando…');
+    try {
+      const resp = await fetch(`${APPS_SCRIPT_URL}?action=getDatos&t=${Date.now()}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      datos = await resp.json();
+
+      actualizarSync(`✅ Actualizado ${horaActual()}`);
+      renderClasificacion();
+      renderPorra();
+      renderPartidos();
+    } catch (e) {
+      console.error('Error cargando datos:', e);
+      actualizarSync('⚠️ Sin conexión — usando datos locales');
+      // Mostrar estado vacío
+      mostrarErrorSinDatos();
+    }
+  }
+
+  function actualizarSync(msg) {
+    document.getElementById('estado-sync').textContent = msg;
+  }
+
+  function horaActual() {
+    return new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function mostrarErrorSinDatos() {
+    ['ranking-container', 'porra-container', 'partidos-container'].forEach(id => {
+      document.getElementById(id).innerHTML = `
+        <div class="error-msg">
+          <div class="icon">📡</div>
+          <p>No se pudo conectar con el servidor.</p>
+          <small>Revisa que la URL del Apps Script esté bien configurada en el archivo HTML.</small>
+          <button class="btn" style="margin-top:14px" onclick="cargarDatos()">Reintentar</button>
+        </div>
+      `;
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  CÁLCULO DE PUNTOS
+  // ══════════════════════════════════════════════════════════
+
+  // Devuelve un mapa { nombreJugador: { grupos, clasif, elim, porra, total } }
+  function calcularPuntos() {
+    if (!datos) return {};
+
+    const puntos = {};
+    JUGADORES.forEach(j => {
+      puntos[j.nombre] = { grupos: 0, clasif: 0, elim: 0, porra: 0, total: 0 };
+    });
+
+    const partidos   = datos.partidos   || [];
+    const clasifGrup = datos.clasificacion || [];
+    const porra      = datos.porra       || [];
+
+    // Mapa seleccion → jugador
+    const selJugador = {};
+    JUGADORES.forEach(j => {
+      selJugador[j.sel1] = j.nombre;
+      selJugador[j.sel2] = j.nombre;
+    });
+
+    // 1. Puntos de partidos de grupos
+    partidos.filter(p => p.fase === 'grupos' && p.estado === 'finalizado').forEach(p => {
+      const gl = parseInt(p.goles_local, 10);
+      const gv = parseInt(p.goles_visitante, 10);
+      if (isNaN(gl) || isNaN(gv)) return;
+
+      const jugLocal    = selJugador[p.equipo_local];
+      const jugVisitante = selJugador[p.equipo_visitante];
+
+      if (gl > gv) {
+        // Gana local
+        if (jugLocal) puntos[jugLocal].grupos += 3;
+      } else if (gv > gl) {
+        // Gana visitante
+        if (jugVisitante) puntos[jugVisitante].grupos += 3;
+      } else {
+        // Empate
+        if (jugLocal) puntos[jugLocal].grupos += 1;
+        if (jugVisitante) puntos[jugVisitante].grupos += 1;
+      }
+    });
+
+    // 2. Clasificación de grupos
+    clasifGrup.forEach(c => {
+      const jug = selJugador[c.seleccion];
+      if (!jug) return;
+      const pos = parseInt(c.posicion_final, 10);
+      if (pos === 1) puntos[jug].clasif += 3;
+      else if (pos === 2) puntos[jug].clasif += 2;
+      else if (pos === 3) puntos[jug].clasif += 1;
+    });
+
+    // 3. Fase eliminatoria
+    partidos.filter(p => p.fase !== 'grupos' && p.estado === 'finalizado').forEach(p => {
+      const ganador = p.ganador; // nombre de la selección ganadora
+      if (!ganador) return;
+      const jug = selJugador[ganador];
+      if (!jug) return;
+
+      const fase = p.fase;
+      const ptsPorFase = {
+        'dieciseisavos': 3,
+        'octavos': 4,
+        'cuartos': 5,
+        'semifinal': 6,
+        'final': 7,
+        'tercer_puesto': 3,
+      };
+      puntos[jug].elim += ptsPorFase[fase] || 0;
+    });
+
+    // 4. Porra: aciertos exactos
+    porra.forEach(ap => {
+      const partido = partidos.find(p => p.id_partido === ap.id_partido);
+      if (!partido || partido.estado !== 'finalizado') return;
+      if (ap.goles_local_pred === undefined || ap.goles_visitante_pred === undefined) return;
+
+      const glPred = parseInt(ap.goles_local_pred, 10);
+      const gvPred = parseInt(ap.goles_visitante_pred, 10);
+      const gl     = parseInt(partido.goles_local, 10);
+      const gv     = parseInt(partido.goles_visitante, 10);
+
+      if (!isNaN(glPred) && !isNaN(gvPred) && glPred === gl && gvPred === gv) {
+        if (puntos[ap.jugador] !== undefined) {
+          puntos[ap.jugador].porra += 3;
+        }
+      }
+    });
+
+    // Calcular total
+    Object.keys(puntos).forEach(nombre => {
+      const p = puntos[nombre];
+      p.total = p.grupos + p.clasif + p.elim + p.porra;
+    });
+
+    return puntos;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  RENDER: CLASIFICACIÓN
+  // ══════════════════════════════════════════════════════════
+  function renderClasificacion() {
+    const puntos = calcularPuntos();
+
+    // Ordenar jugadores por puntos
+    const ranking = JUGADORES
+      .map(j => ({ ...j, ...puntos[j.nombre] }))
+      .sort((a, b) => b.total - a.total);
+
+    const html = ranking.map((j, i) => {
+      const pos    = i + 1;
+      const clases = pos === 1 ? 'top1' : pos === 2 ? 'top2' : pos === 3 ? 'top3' : '';
+      const trofeo = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : '';
+
+      return `
+        <div class="ranking-item ${clases}" onclick="toggleDesglose(this)">
+          <div class="pos">${trofeo || pos}</div>
+          <div class="jugador-info">
+            <div class="jugador-nombre">
+              ${j.nombre}
+            </div>
+            <div class="jugador-selecciones">
+              ${BANDERAS[j.sel1] || ''} ${j.sel1} · ${BANDERAS[j.sel2] || ''} ${j.sel2}
+            </div>
+            <div class="desglose">
+              <div class="desg-item">
+                <span class="desg-label">Fase grupos</span>
+                <span class="desg-val">${j.grupos} pts</span>
+              </div>
+              <div class="desg-item">
+                <span class="desg-label">Clasif. grupos</span>
+                <span class="desg-val">${j.clasif} pts</span>
+              </div>
+              <div class="desg-item">
+                <span class="desg-label">Eliminatorias</span>
+                <span class="desg-val">${j.elim} pts</span>
+              </div>
+              <div class="desg-item">
+                <span class="desg-label">Porra</span>
+                <span class="desg-val">${j.porra} pts</span>
+              </div>
+            </div>
+          </div>
+          <div class="puntos-total">${j.total}</div>
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('ranking-container').innerHTML =
+      '<p style="font-size:0.75rem;color:var(--gris);margin-bottom:10px">Toca un jugador para ver el desglose</p>' + html;
+  }
+
+  function toggleDesglose(el) {
+    const d = el.querySelector('.desglose');
+    d.classList.toggle('visible');
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  RENDER: PORRA
+  // ══════════════════════════════════════════════════════════
+  function renderPorra() {
+    const partidos = (datos?.partidos || []).filter(p =>
+      p.fase !== 'grupos' && esPartidoRelevante(p)
+    );
+
+    if (partidos.length === 0) {
+      document.getElementById('porra-container').innerHTML = `
+        <div class="card" style="text-align:center; color:var(--gris); padding:30px">
+          <div style="font-size:2rem">🎯</div>
+          <p style="margin-top:8px;font-size:0.85rem">La porra se activa en la fase eliminatoria.<br>¡Vuelve cuando empiece!</p>
+        </div>
+      `;
+      return;
+    }
+
+    const porraMap = {};
+    (datos?.porra || []).forEach(ap => {
+      const key = `${ap.id_partido}_${ap.jugador}`;
+      porraMap[key] = ap;
+    });
+
+    const html = partidos.map(p => {
+      const ahora    = new Date();
+      const fechaP   = new Date(p.fecha_hora);
+      const bloqueado = p.estado === 'en_juego' || p.estado === 'finalizado' || fechaP <= ahora;
+      const finalizado = p.estado === 'finalizado';
+
+      const predFilas = JUGADORES.map(j => {
+        const ap = porraMap[`${p.id_partido}_${j.nombre}`];
+        const glP = ap ? ap.goles_local_pred : '';
+        const gvP = ap ? ap.goles_visitante_pred : '';
+
+        // ¿Acierto exacto?
+        let chipAcierto = '';
+        if (finalizado && ap && String(glP) === String(p.goles_local) && String(gvP) === String(p.goles_visitante)) {
+          chipAcierto = '<span class="pred-resultado pred-ok">✅ +3</span>';
+        } else if (finalizado && ap && (glP !== '' || gvP !== '')) {
+          chipAcierto = '<span class="pred-resultado pred-no">❌</span>';
+        }
+
+        const disabled = (!esAdmin || bloqueado) ? 'disabled' : '';
+        return `
+          <div class="pred-fila">
+            <div class="pred-nombre">${j.nombre}</div>
+            <div class="pred-input">
+              <input type="number" min="0" max="30" value="${glP}"
+                     id="pred_${p.id_partido}_${j.nombre}_l" ${disabled}
+                     placeholder="-" />
+              <span class="pred-guion">–</span>
+              <input type="number" min="0" max="30" value="${gvP}"
+                     id="pred_${p.id_partido}_${j.nombre}_v" ${disabled}
+                     placeholder="-" />
+            </div>
+            ${chipAcierto}
+          </div>
+        `;
+      }).join('');
+
+      const resultado = finalizado
+        ? `<div class="resultado-real">Resultado: ${p.goles_local} – ${p.goles_visitante}</div>`
+        : '';
+
+      const badgeClass = p.estado === 'finalizado' ? 'badge-finalizado'
+                       : p.estado === 'en_juego'   ? 'badge-en-juego'
+                       : 'badge-pendiente';
+      const badgeText  = p.estado === 'finalizado' ? 'Finalizado'
+                       : p.estado === 'en_juego'   ? '🔴 En juego'
+                       : '⏳ Pendiente';
+
+      const btnGuardar = (esAdmin && !bloqueado) ? `
+        <button class="btn" style="margin-top:10px" onclick="guardarPorra(${p.id_partido})">
+          💾 Guardar predicciones
+        </button>
+      ` : '';
+
+      return `
+        <div class="porra-partido">
+          <div class="porra-cabecera">
+            <span class="porra-partido-nombre">
+              ${BANDERAS[p.equipo_local]||''} ${p.equipo_local}
+              vs
+              ${BANDERAS[p.equipo_visitante]||''} ${p.equipo_visitante}
+            </span>
+            <span class="badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="porra-cuerpo">
+            <div class="porra-fecha">${formatFecha(p.fecha_hora)}</div>
+            ${resultado}
+            <div class="pred-lista">${predFilas}</div>
+            ${btnGuardar}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('porra-container').innerHTML = html;
+  }
+
+  // ── Guarda predicciones de un partido via Apps Script ──
+  async function guardarPorra(idPartido) {
+    if (!esAdmin) { mostrarToast('Necesitas ser admin', 'error'); return; }
+
+    const predicciones = JUGADORES.map(j => {
+      const glInput = document.getElementById(`pred_${idPartido}_${j.nombre}_l`);
+      const gvInput = document.getElementById(`pred_${idPartido}_${j.nombre}_v`);
+      return {
+        jugador: j.nombre,
+        goles_local_pred:     glInput?.value ?? '',
+        goles_visitante_pred: gvInput?.value ?? '',
+      };
+    }).filter(p => p.goles_local_pred !== '' && p.goles_visitante_pred !== '');
+
+    if (predicciones.length === 0) {
+      mostrarToast('Introduce al menos una predicción', 'error');
+      return;
+    }
+
+    mostrarToast('Guardando…');
+    try {
+      const resp = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'guardarPorra', id_partido: idPartido, predicciones }),
+      });
+      const res = await resp.json();
+      if (res.ok) {
+        mostrarToast('✅ Predicciones guardadas', 'ok');
+        await cargarDatos(); // recarga datos
+      } else {
+        throw new Error(res.error || 'Error desconocido');
+      }
+    } catch (e) {
+      mostrarToast('❌ Error al guardar: ' + e.message, 'error');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  RENDER: PARTIDOS
+  // ══════════════════════════════════════════════════════════
+  function renderPartidos() {
+    const todos = (datos?.partidos || []).filter(p => esPartidoRelevante(p));
+    mostrarPartidosFiltrados(todos);
+  }
+
+  function esPartidoRelevante(p) {
+    const sels = JUGADORES.flatMap(j => [j.sel1, j.sel2]);
+    return sels.includes(p.equipo_local) || sels.includes(p.equipo_visitante);
+  }
+
+  function filtrarPartidos(estado, btn) {
+    filtroActual = estado;
+    document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('activo'));
+    btn.classList.add('activo');
+    if (!datos) return;
+    const todos = (datos?.partidos || []).filter(p => esPartidoRelevante(p));
+    const filtrados = estado === 'todos' ? todos : todos.filter(p => p.estado === estado);
+    mostrarPartidosFiltrados(filtrados);
+  }
+
+  function mostrarPartidosFiltrados(lista) {
+    if (lista.length === 0) {
+      document.getElementById('partidos-container').innerHTML = `
+        <div class="card" style="text-align:center;color:var(--gris);padding:30px">
+          <div style="font-size:2rem">🔍</div>
+          <p style="margin-top:8px;font-size:0.85rem">No hay partidos en este estado</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Calcular puntos generados por partido
+    const puntosPorPartido = calcularPuntosPorPartido();
+
+    const html = lista.map(p => {
+      const finalizado = p.estado === 'finalizado';
+      const enJuego    = p.estado === 'en_juego';
+
+      const marcadorHTML = finalizado
+        ? `<div class="partido-goles">${p.goles_local} – ${p.goles_visitante}</div>`
+        : enJuego
+          ? `<div class="partido-goles" style="color:var(--rojo)">🔴 En juego</div>`
+          : `<div class="partido-pendiente">vs</div>`;
+
+      const badgeClass = finalizado ? 'badge-finalizado' : enJuego ? 'badge-en-juego' : 'badge-pendiente';
+      const badgeText  = finalizado ? 'Finalizado' : enJuego ? '🔴 En juego' : 'Pendiente';
+
+      // Chips de puntos generados
+      const chips = (puntosPorPartido[p.id_partido] || []).map(c =>
+        `<span class="punto-chip">${c}</span>`
+      ).join('');
+
+      // ¿Las selecciones son asignadas?
+      const selLocal = JUGADORES.find(j => j.sel1 === p.equipo_local || j.sel2 === p.equipo_local);
+      const selVisit = JUGADORES.find(j => j.sel1 === p.equipo_visitante || j.sel2 === p.equipo_visitante);
+
+      return `
+        <div class="partido-card">
+          <div class="partido-fase">${labelFase(p.fase)}${p.grupo ? ' · Grupo ' + p.grupo : ''}</div>
+          <div class="partido-cuerpo">
+            <div class="partido-fecha">
+              <span>${formatFecha(p.fecha_hora)}</span>
+              <span class="badge ${badgeClass}">${badgeText}</span>
+            </div>
+            <div class="partido-equipos">
+              <div class="partido-equipo">
+                <span class="partido-bandera">${BANDERAS[p.equipo_local] || '🏳️'}</span>
+                <div class="partido-nombre-equipo">${p.equipo_local}</div>
+                ${selLocal ? `<div class="partido-asignado">${selLocal.nombre}</div>` : ''}
+              </div>
+              <div class="partido-marcador">${marcadorHTML}</div>
+              <div class="partido-equipo">
+                <span class="partido-bandera">${BANDERAS[p.equipo_visitante] || '🏳️'}</span>
+                <div class="partido-nombre-equipo">${p.equipo_visitante}</div>
+                ${selVisit ? `<div class="partido-asignado">${selVisit.nombre}</div>` : ''}
+              </div>
+            </div>
+            ${chips ? `<div class="partido-puntos">${chips}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('partidos-container').innerHTML = html;
+  }
+
+  // Devuelve mapa { id_partido: ['Mery +3', 'Leo +1', ...] }
+  function calcularPuntosPorPartido() {
+    if (!datos) return {};
+    const result = {};
+    const partidos  = datos.partidos || [];
+    const porraData = datos.porra    || [];
+
+    const selJugador = {};
+    JUGADORES.forEach(j => {
+      selJugador[j.sel1] = j.nombre;
+      selJugador[j.sel2] = j.nombre;
+    });
+
+    partidos.filter(p => p.estado === 'finalizado').forEach(p => {
+      result[p.id_partido] = [];
+      const gl = parseInt(p.goles_local, 10);
+      const gv = parseInt(p.goles_visitante, 10);
+      if (isNaN(gl) || isNaN(gv)) return;
+
+      if (p.fase === 'grupos') {
+        const jugL = selJugador[p.equipo_local];
+        const jugV = selJugador[p.equipo_visitante];
+        if (gl > gv && jugL) result[p.id_partido].push(`${jugL} +3`);
+        if (gv > gl && jugV) result[p.id_partido].push(`${jugV} +3`);
+        if (gl === gv) {
+          if (jugL) result[p.id_partido].push(`${jugL} +1`);
+          if (jugV) result[p.id_partido].push(`${jugV} +1`);
+        }
+      } else {
+        // Eliminatoria
+        const ganador = p.ganador;
+        if (ganador) {
+          const jug = selJugador[ganador];
+          const pts = { 'dieciseisavos':3,'octavos':4,'cuartos':5,'semifinal':6,'final':7,'tercer_puesto':3 };
+          if (jug && pts[p.fase]) result[p.id_partido].push(`${jug} +${pts[p.fase]}`);
+        }
+      }
+
+      // Porra
+      porraData.filter(a => a.id_partido === p.id_partido).forEach(ap => {
+        if (String(ap.goles_local_pred) === String(gl) && String(ap.goles_visitante_pred) === String(gv)) {
+          result[p.id_partido].push(`🎯 ${ap.jugador} +3`);
+        }
+      });
+    });
+
+    return result;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  ADMIN
+  // ══════════════════════════════════════════════════════════
+  function pedirPassword() {
+    const pass = prompt('🔑 Introduce la contraseña de administrador:');
+    if (pass === ADMIN_PASSWORD) {
+      esAdmin = true;
+      document.getElementById('panel-admin').style.display = 'block';
+      mostrarToast('✅ Sesión de admin iniciada', 'ok');
+      renderPorra();
+    } else if (pass !== null) {
+      mostrarToast('❌ Contraseña incorrecta', 'error');
+    }
+  }
+
+  function cerrarAdmin() {
+    esAdmin = false;
+    document.getElementById('panel-admin').style.display = 'none';
+    mostrarToast('Sesión cerrada');
+    renderPorra();
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  NAVEGACIÓN
+  // ══════════════════════════════════════════════════════════
+  function cambiarSeccion(nombre, btn) {
+    document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('activo'));
+    document.getElementById(`sec-${nombre}`).classList.add('activa');
+    btn.classList.add('activo');
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  UTILIDADES
+  // ══════════════════════════════════════════════════════════
+  function formatFecha(str) {
+    if (!str) return '—';
+    const d = new Date(str);
+    if (isNaN(d)) return str;
+    return d.toLocaleDateString('es-ES', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function labelFase(fase) {
+    const labels = {
+      'grupos': 'Fase de Grupos',
+      'dieciseisavos': 'Dieciseisavos',
+      'octavos': 'Octavos de Final',
+      'cuartos': 'Cuartos de Final',
+      'semifinal': 'Semifinal',
+      'tercer_puesto': 'Tercer Puesto',
+      'final': 'Final',
+    };
+    return labels[fase] || fase;
+  }
+
+  function mostrarToast(msg, tipo = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'visible ' + tipo;
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.className = ''; }, 3000);
+  }
+  </script>
+</body>
+</html>
